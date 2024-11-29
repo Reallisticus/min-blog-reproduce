@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay } from "swiper/modules";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "swiper/css";
 
 interface BlogPost {
@@ -89,6 +89,7 @@ const BlogSection = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isMouseWithinBounds, setIsMouseWithinBounds] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isPositioned, setIsPositioned] = useState(false);
 
   const slideGroups = Array.from(
     { length: Math.ceil(posts.length / 3) },
@@ -96,6 +97,24 @@ const BlogSection = () => {
   );
 
   const getPositionInGroup = (index: number) => index % 3;
+
+  useEffect(() => {
+    if (hoveredIndex !== null && !isPositioned) {
+      const timer = setTimeout(() => {
+        setIsPositioned(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [hoveredIndex]);
+
+  useEffect(() => {
+    if (isPositioned && !isExpanded) {
+      const timer = setTimeout(() => {
+        setIsExpanded(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isPositioned]);
 
   const slideVariants = {
     normal: {
@@ -107,14 +126,26 @@ const BlogSection = () => {
     },
     hovered: (index: number) => {
       const position = getPositionInGroup(index);
+      const xOffset = position === 0 ? 0 : position === 1 ? "-100%" : "-200%";
+      const adjustedX = isExpanded
+        ? position === 0
+          ? 0
+          : position === 1
+            ? 0
+            : 0
+        : xOffset;
+
       return {
-        flex: isExpanded ? 1 : 3,
+        flex: 1,
         opacity: 1,
-        width: isExpanded ? "100%" : "auto",
-        x: position === 0 ? 0 : position === 1 ? "-100%" : "-200%",
+        width: isExpanded ? "70rem" : "auto",
+        x: xOffset,
         transition: {
-          duration: 0.5,
-          ease: "easeInOut",
+          x: { duration: 0.5, ease: "easeInOut" },
+          width: {
+            delay: isPositioned ? 0.5 : 0,
+            duration: 0.3,
+          },
           opacity: { duration: 0.2 },
         },
       };
@@ -122,7 +153,6 @@ const BlogSection = () => {
     hidden: {
       flex: 0,
       opacity: 0,
-      scale: 0.8,
       transition: {
         duration: 0.3,
         ease: "easeInOut",
@@ -140,18 +170,25 @@ const BlogSection = () => {
       swiperRef.current?.autoplay.stop();
       setIsTransitioning(true);
       setHoveredIndex(globalIndex);
+      setIsPositioned(false);
+      setIsExpanded(false);
 
       hoverTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
         setHoveredIndex(null);
+        setIsPositioned(false);
+        setIsExpanded(false);
         swiperRef.current?.autoplay.start();
-      }, 3000); // Reset after 3 seconds
+      }, 3000);
     }
   };
 
   const handleHoverEnd = () => {
     if (!isMouseWithinBounds) {
       setIsTransitioning(false);
+      setIsPositioned(false);
+      setIsExpanded(false);
+
       setTimeout(() => {
         setHoveredIndex(null);
         swiperRef.current?.autoplay.start();
@@ -197,6 +234,8 @@ const BlogSection = () => {
                 <React.Fragment key={groupIndex}>
                   {group.map((post, index) => {
                     const globalIndex = groupIndex * 3 + index;
+                    const position = getPositionInGroup(index);
+
                     return (
                       <SwiperSlide
                         key={post.title}
@@ -215,6 +254,14 @@ const BlogSection = () => {
                           variants={slideVariants}
                           custom={index}
                           className="h-full cursor-pointer"
+                          style={{
+                            transformOrigin:
+                              position === 1
+                                ? "left"
+                                : position === 2
+                                  ? "left"
+                                  : "right",
+                          }}
                           onHoverStart={() => handleHoverStart(globalIndex)}
                           onHoverEnd={handleHoverEnd}
                           onAnimationComplete={() => {
@@ -223,7 +270,13 @@ const BlogSection = () => {
                             }
                           }}
                         >
-                          <div className="overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-500">
+                          <motion.div
+                            // animate={{
+                            //   scale: hoveredIndex === globalIndex ? 1.05 : 1,
+                            // }}
+                            // transition={{ duration: 0.3 }}
+                            className="overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-500"
+                          >
                             <div className="relative h-48">
                               <Image
                                 src={post.image}
@@ -247,7 +300,7 @@ const BlogSection = () => {
                                 <span>{post.readTime}</span>
                               </div>
                             </div>
-                          </div>
+                          </motion.div>
                         </motion.div>
                       </SwiperSlide>
                     );
